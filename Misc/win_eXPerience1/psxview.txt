@@ -1,0 +1,28 @@
+Offset(P)  Name                    PID pslist psscan thrdproc pspcid csrss session deskthrd ExitTime
+---------- -------------------- ------ ------ ------ -------- ------ ----- ------- -------- --------
+0x017410c0 CSCG_Delphi.exe        1920 True   True   True     True   True  True    True     
+0x01a43e08 winlogon.exe            524 True   True   True     True   True  True    True     
+0x016db190 wpabaln.exe             988 True   True   True     True   True  True    True     
+0x0175bcd8 alg.exe                1176 True   True   True     True   True  True    True     
+0x01abf5a8 svchost.exe            1024 True   True   True     True   True  True    True     
+0x0176e830 mspaint.exe             264 True   True   True     True   True  True    True     
+0x0176a7c8 wuauclt.exe            1300 True   True   True     True   True  True    True     
+0x01a189b8 svchost.exe             840 True   True   True     True   True  True    True     
+0x01950128 svchost.exe            1076 True   True   True     True   True  True    True     
+0x01796ac0 VBoxTray.exe           1644 True   True   True     True   True  True    True     
+0x017abfe0 wscntfy.exe            1776 True   True   True     True   True  True    True     
+0x017cfb48 ctfmon.exe             1652 True   True   True     True   True  True    True     
+0x017b47d0 spoolsv.exe            1536 True   True   True     True   True  True    True     
+0x017b5878 explorer.exe           1524 True   True   True     True   True  True    True     
+0x01a0f258 VBoxService.exe         792 True   True   True     True   True  True    True     
+0x01a2fcc8 lsass.exe               644 True   True   True     True   True  True    True     
+0x017dc4d8 svchost.exe            1120 True   True   True     True   True  True    True     
+0x01ac1e60 svchost.exe             928 True   True   True     True   True  True    True     
+0x01981258 services.exe            632 True   True   True     True   True  True    True     
+0x016da8f0 TrueCrypt.exe           200 True   True   True     True   True  True    True     
+0x016e66a8 svchost.exe            1688 True   True   True     True   True  True    True     
+0x0172d078 svchost.exe             548 True   True   True     True   True  True    True     
+0x017934d8 msmsgs.exe             1660 True   True   True     True   True  True    True     
+0x01bceeb8 System                    4 True   True   True     True   False False   False    
+0x01a48de0 csrss.exe               496 True   True   True     True   False True    True     
+0x01a07258 smss.exe                340 True   True   True     True   False False   False    

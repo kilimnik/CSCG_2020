@@ -1,0 +1,1 @@
+Look at the meme in the announcement channel. It is in the right left corner.
