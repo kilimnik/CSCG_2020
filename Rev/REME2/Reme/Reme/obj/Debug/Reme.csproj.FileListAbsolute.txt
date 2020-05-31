@@ -1,0 +1,7 @@
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\obj\Debug\Reme.csprojAssemblyReference.cache
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\obj\Debug\Reme.csproj.CoreCompileInputs.cache
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\bin\Debug\Reme.exe.config
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\bin\Debug\Reme.exe
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\bin\Debug\Reme.pdb
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\obj\Debug\Reme.exe
+C:\Users\Daniel\Desktop\Reme\Reme\Reme\obj\Debug\Reme.pdb
